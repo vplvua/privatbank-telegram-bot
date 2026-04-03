@@ -123,17 +123,28 @@
 }
 ```
 
-Зберігається в Vercel KV (v1) або JSON-файлі (після міграції на VPS).
+Ключ унікальності транзакції: конкатенація `REF` + `REFN` (офіційна рекомендація ПриватБанку).
+
+Зберігається в **Upstash Redis** (v1, через Vercel Integration) або JSON-файлі (після міграції на VPS).
+
+> ℹ️ `@vercel/kv` задепрекейтований. Використовується `@upstash/redis` — офіційна заміна від Vercel.
 
 ---
 
 ## 7. Environment Variables
 
 ```env
+# PrivatBank
 PRIVATBANK_TOKEN=...
 PRIVATBANK_ACCOUNT=UA...
+
+# Telegram
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
+
+# Upstash Redis (підтягуються автоматично через vercel env pull після підключення Integration)
+UPSTASH_REDIS_REST_URL=https://...upstash.io
+UPSTASH_REDIS_REST_TOKEN=...
 ```
 
 ---

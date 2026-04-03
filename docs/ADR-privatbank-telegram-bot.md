@@ -30,7 +30,7 @@
 
 - ✅ Найменше рухомих частин
 - ✅ Не потрібен окремий моніторинг процесу
-- ⚠️ Легка залежність від Vercel KV для стану (але тривіально замінюється при міграції)
+- ⚠️ Легка залежність від Upstash Redis для стану (але тривіально замінюється при міграції)
 - ⚠️ Функція має timeout 60s (Pro) — достатньо для polling
 
 ### Rejected Alternatives
@@ -47,40 +47,59 @@
 ## ADR-002: Persistent Storage для стану
 
 **Status:** Accepted  
-**Date:** 2026-04-02
+**Date:** 2026-04-02  
+**Updated:** 2026-04-03
 
 ### Context
 
 Необхідно зберігати мінімальний стан між викликами cron-функції: ідентифікатор або timestamp останньої обробленої транзакції. Без цього — дублікати або пропущені транзакції після cold start.
 
+Початково розглядався `@vercel/kv`, однак він **задепрекейтований** (квітень 2026) і офіційно замінений на Upstash Redis через Vercel Integrations.
+
 ### Decision
 
-**Vercel KV (Redis) для v1. При міграції на VPS — заміна на SQLite або JSON-файл.**
+**Upstash Redis (`@upstash/redis`) для v1. При міграції на VPS — заміна на SQLite або JSON-файл.**
 
-Ключ: `last_processed_txn`  
-Значення: JSON `{ "id": "...", "timestamp": "..." }`
+Ключ: `last_processed_txns`  
+Значення: JSON `{ "processedKeys": ["REF1", "REF2"], "checkedAt": "2026-04-03T10:00:00Z" }`
 
 ### Rationale
 
-- Вбудований в Vercel, нульова конфігурація
-- Redis `SET/GET` — простіше не буває
+- Офіційна заміна задепрекейтованого `@vercel/kv` — рекомендована самим Vercel
+- Підключається через Vercel Integrations → env змінні підтягуються автоматично
+- Безкоштовний tier Upstash: 10,000 команд/день → більш ніж достатньо (бот робить ~576 команд/день)
+- API (`get` / `set`) майже ідентичне до старого `@vercel/kv`
 - При міграції замінюється за 15 хвилин (один модуль `storage.ts`)
+
+### Package
+
+```bash
+npm install @upstash/redis
+```
+
+### Env змінні (підтягуються автоматично після підключення в Vercel Dashboard)
+
+```env
+UPSTASH_REDIS_REST_URL=https://...upstash.io
+UPSTASH_REDIS_REST_TOKEN=...
+```
 
 ### Consequences
 
 - ✅ Атомарні операції — no race conditions між cron викликами
 - ✅ Ізольований шар — зміна storage не торкається бізнес-логіки
-- ⚠️ Vercel KV специфічний імпорт — треба абстрагувати через interface
+- ✅ Офіційно підтримуваний шлях від Vercel
+- ⚠️ Зовнішній сервіс (Upstash) — але безкоштовний і надійний
 
 ### Migration Path (VPS)
 
 ```typescript
 // Замінити тільки цей файл:
-// storage/vercel-kv.ts → storage/sqlite.ts або storage/json-file.ts
+// lib/storage.ts (Upstash impl) → lib/storage.ts (SQLite або JSON-file impl)
 // Інтерфейс залишається незмінним
 interface Storage {
-  getLastTransaction(): Promise<LastTxn | null>
-  setLastTransaction(txn: LastTxn): Promise<void>
+  getProcessedKeys(): Promise<string[]>
+  saveProcessedKeys(keys: string[]): Promise<void>
 }
 ```
 
@@ -163,7 +182,7 @@ privatbank-telegram-bot/
 ├── lib/
 │   ├── privatbank.ts               ← PrivatBank API client
 │   ├── telegram.ts                 ← Telegram Bot API client
-│   ├── storage.ts                  ← Storage interface + Vercel KV impl
+│   ├── storage.ts                  ← Storage interface + Upstash Redis impl
 │   └── types.ts                    ← Shared TypeScript types
 ├── vercel.json                     ← Cron config
 ├── .env.local                      ← Local dev secrets
