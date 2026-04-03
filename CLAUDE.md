@@ -45,7 +45,8 @@ Required in `.env.local` (never committed):
 ```
 PRIVATBANK_TOKEN, PRIVATBANK_ACCOUNT — bank API credentials
 TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID — bot delivery target
-UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN — auto-populated via Vercel Integration
+KV_REST_API_URL, KV_REST_API_TOKEN — Upstash Redis, auto-populated via Vercel Integration
+CRON_SECRET — optional, Vercel cron auth (add manually if needed)
 ```
 
 ## Coding Conventions
