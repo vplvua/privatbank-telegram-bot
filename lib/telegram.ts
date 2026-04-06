@@ -44,23 +44,32 @@ export async function sendTransactionMessage(txn: PrivatTransaction): Promise<bo
   const icon = isCredit ? '🟢' : '🔴'
   const type = isCredit ? 'Надходження' : 'Списання'
   const sign = isCredit ? '+' : '-'
-  const counterpartyLabel = isCredit ? 'Від' : 'Отримувач'
 
   const lines = [
     `${icon} <b>${type}</b>`,
-    `Сума: ${sign}${formatAmount(txn.SUM, txn.CCY)}`,
-    `${counterpartyLabel}: ${txn.AUT_CNTR_NAM}`,
-    `Призначення: ${txn.OSND}`,
-    `Час: ${formatDateTime(txn.DATE_TIME_DAT_OD_TIM_P)}`,
+    `${sign}${formatAmount(txn.SUM, txn.CCY)}`,
+    `${txn.AUT_CNTR_NAM}`,
+    `${txn.OSND}`,
+    `${formatDateTime(txn.DATE_TIME_DAT_OD_TIM_P)}`,
   ]
 
   return sendMessage(lines.join('\n'))
 }
 
 export async function sendHeartbeat(checkedAt: string, txnCount: number): Promise<boolean> {
+  const date = new Date(checkedAt)
+  const formatted = date.toLocaleString('uk-UA', {
+    timeZone: 'Europe/Kyiv',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
   const lines = [
     '💚 <b>Бот працює</b>',
-    `Остання перевірка: ${checkedAt}`,
+    `Остання перевірка: ${formatted}`,
     `Транзакцій за добу: ${txnCount}`,
   ]
 
