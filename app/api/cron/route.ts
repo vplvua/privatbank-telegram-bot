@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { checkServerStatus, fetchInterimTransactions, getTxnKey } from '@/lib/privatbank'
-import { sendTransactionMessage } from '@/lib/telegram'
+import { sendTransactionMessage, sendHeartbeat } from '@/lib/telegram'
 import { getProcessedState, saveProcessedState } from '@/lib/storage'
 
 export async function GET(request: Request) {
@@ -57,11 +57,26 @@ export async function GET(request: Request) {
       }
     }
 
-    // Step 7: Update stored state with all current transaction keys
+    // Step 7: Heartbeat — send daily "bot alive" message
+    const now = new Date()
+    let lastHeartbeatAt = state.lastHeartbeatAt
+    const shouldSendHeartbeat = !lastHeartbeatAt ||
+      now.getTime() - new Date(lastHeartbeatAt).getTime() >= 24 * 60 * 60 * 1000
+
+    if (shouldSendHeartbeat) {
+      const sent = await sendHeartbeat(now.toISOString(), transactions.length)
+      if (sent) {
+        lastHeartbeatAt = now.toISOString()
+        console.log('Heartbeat sent')
+      }
+    }
+
+    // Step 8: Update stored state with all current transaction keys
     const allKeys = transactions.map(getTxnKey)
     await saveProcessedState({
       processedKeys: allKeys,
-      checkedAt: new Date().toISOString(),
+      checkedAt: now.toISOString(),
+      lastHeartbeatAt,
     })
 
     console.log(`Done: sent ${sentCount}/${newTransactions.length} notifications`)

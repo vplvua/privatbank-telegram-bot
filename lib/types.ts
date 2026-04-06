@@ -52,4 +52,5 @@ export interface PrivatSettingsResponse {
 export interface StorageState {
   processedKeys: string[]
   checkedAt: string
+  lastHeartbeatAt?: string
 }
