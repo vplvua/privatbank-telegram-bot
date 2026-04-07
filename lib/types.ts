@@ -49,8 +49,13 @@ export interface PrivatSettingsResponse {
 
 // Storage types
 
+export interface ProcessedKeyEntry {
+  key: string
+  addedAt: string
+}
+
 export interface StorageState {
-  processedKeys: string[]
+  processedKeys: ProcessedKeyEntry[]
   checkedAt: string
   lastHeartbeatAt?: string
 }

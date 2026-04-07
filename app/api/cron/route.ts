@@ -29,22 +29,31 @@ export async function GET(request: Request) {
     const state = await getProcessedState()
 
     // Step 4: Cold start — save current keys without sending
+    const now = new Date()
     if (!state) {
       console.log('Cold start: saving current transaction keys without sending')
-      const keys = transactions.map(getTxnKey)
+      const entries = transactions.map((txn) => ({
+        key: getTxnKey(txn),
+        addedAt: now.toISOString(),
+      }))
       await saveProcessedState({
-        processedKeys: keys,
-        checkedAt: new Date().toISOString(),
+        processedKeys: entries,
+        checkedAt: now.toISOString(),
       })
-      return NextResponse.json({ coldStart: true, savedKeys: keys.length })
+      return NextResponse.json({ coldStart: true, savedKeys: entries.length })
     }
 
     // Step 5: Find new transactions (deduplicate by REF+REFN)
-    const knownKeys = new Set(state.processedKeys)
+    // Keep keys for 48h to survive banking day transitions
+    const cutoff = new Date(now.getTime() - 48 * 60 * 60 * 1000)
+    const validEntries = state.processedKeys.filter(
+      (entry) => new Date(entry.addedAt) > cutoff
+    )
+    const knownKeys = new Set(validEntries.map((entry) => entry.key))
     const newTransactions = transactions.filter(
       (txn) => !knownKeys.has(getTxnKey(txn))
     )
-    console.log(`New transactions: ${newTransactions.length}`)
+    console.log(`New transactions: ${newTransactions.length}, known keys: ${knownKeys.size}`)
 
     // Step 6: Send notifications
     let sentCount = 0
@@ -58,7 +67,6 @@ export async function GET(request: Request) {
     }
 
     // Step 7: Heartbeat — send daily "bot alive" message
-    const now = new Date()
     let lastHeartbeatAt = state.lastHeartbeatAt
     const shouldSendHeartbeat = !lastHeartbeatAt ||
       now.getTime() - new Date(lastHeartbeatAt).getTime() >= 24 * 60 * 60 * 1000
@@ -71,10 +79,15 @@ export async function GET(request: Request) {
       }
     }
 
-    // Step 8: Update stored state with all current transaction keys
-    const allKeys = transactions.map(getTxnKey)
+    // Step 8: Merge new keys with existing, keep only last 48h
+    const newEntries = newTransactions.map((txn) => ({
+      key: getTxnKey(txn),
+      addedAt: now.toISOString(),
+    }))
+    const mergedKeys = [...validEntries, ...newEntries]
+
     await saveProcessedState({
-      processedKeys: allKeys,
+      processedKeys: mergedKeys,
       checkedAt: now.toISOString(),
       lastHeartbeatAt,
     })
